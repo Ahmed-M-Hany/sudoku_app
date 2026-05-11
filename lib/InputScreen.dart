@@ -1,6 +1,5 @@
-import 'dart:ffi';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'soduku.dart';
 
 class InputScreen extends StatefulWidget {
@@ -11,66 +10,91 @@ class InputScreen extends StatefulWidget {
 }
 
 class _InputScreenState extends State<InputScreen> {
+  bool _isLoading = false;
+
   List<List<TextEditingController>> controllers = List.generate(
       9, (_) => List.generate(9, (_)=>TextEditingController(), growable: false),
       growable: false);
 
   Widget? buildBoard() {
-    List<Expanded> boardProMax = [];
+    List<Expanded> board = [];
     for (int i = 0; i < 9; i++) {
-      List<Expanded> ff = [];
+      List<Expanded> tableRow = [];
       for (int j = 0; j < 9; j++) {
-        ff.add(Expanded(
+        double topWidth = (i % 3 == 0) ? 2.0 : 0.5;
+        double bottomWidth = (i == 8) ? 2.0 : 0.0;
+        double leftWidth = (j % 3 == 0) ? 2.0 : 0.5;
+        double rightWidth = (j == 8) ? 2.0 : 0.0;
+
+        tableRow.add(Expanded(
           child: Container(
-
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.green),
+                border: Border(
+                  top: BorderSide(color: Colors.black, width: topWidth),
+                  bottom: BorderSide(color: Colors.black, width: bottomWidth),
+                  left: BorderSide(color: Colors.black, width: leftWidth),
+                  right: BorderSide(color: Colors.black, width: rightWidth),
+                ),
               ),
-
-              child: TextField(
-                textInputAction: TextInputAction.next,
-                maxLength: 1,
-                onChanged: (_) =>FocusScope.of(context).nextFocus(),
-                keyboardType: TextInputType.number,
-                controller: controllers[i][j],
-                decoration: const InputDecoration(
-                  focusedBorder: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  disabledBorder: InputBorder.none,
+              child: Center(
+                child: TextField(
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  textInputAction: TextInputAction.next,
+                  maxLength: 1,
+                  buildCounter: (BuildContext context, { int? currentLength, int? maxLength, bool? isFocused }) => null,
+                  onChanged: (_) => FocusScope.of(context).nextFocus(),
+                  keyboardType: TextInputType.number,
+                  controller: controllers[i][j],
+                  decoration: const InputDecoration(
+                    contentPadding: EdgeInsets.zero,
+                    isDense: true,
+                    focusedBorder: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                  ),
                 ),
               )),
         ));
       }
       Row r = Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: ff,
+        children: tableRow,
       );
-      boardProMax.add(Expanded(child: r));
+      board.add(Expanded(child: r));
     }
-    return Column(
-      // mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-            flex: 11,
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          AspectRatio(
+            aspectRatio: 1.0,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                boardProMax[0],
-                boardProMax[1],
-                boardProMax[2],
-                boardProMax[3],
-                boardProMax[4],
-                boardProMax[5],
-                boardProMax[6],
-                boardProMax[7],
-                boardProMax[8],
+                board[0],
+                board[1],
+                board[2],
+                board[3],
+                board[4],
+                board[5],
+                board[6],
+                board[7],
+                board[8],
               ],
-            )),
-        Expanded(
-          flex: 1,
-          child: ElevatedButton(
-            onPressed: () => setState(() {
+            ),
+          ),
+          const SizedBox(height: 60),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.black,
+              foregroundColor: Colors.white,
+              textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              padding: const EdgeInsets.all(16.0),
+            ),
+            onPressed: _isLoading ? null : () async {
               List<List<int>> soduku =
                   List.generate(9, (_) => List.filled(9, 0, growable: false));
               for (int i = 0; i < 9; i++) {
@@ -82,30 +106,82 @@ class _InputScreenState extends State<InputScreen> {
                   }
                 }
               }
-              soduku = Solver.solve(soduku);
 
-              for (int i = 0; i < 9; i++) {
-                for (int j = 0; j < 9; j++) {
-                  controllers[i][j].text = soduku[i][j].toString();
+              setState(() {
+                _isLoading = true;
+              });
+
+              try {
+                final result = await compute(Solver.solve, soduku);
+
+                setState(() {
+                  for (int i = 0; i < 9; i++) {
+                    for (int j = 0; j < 9; j++) {
+                      controllers[i][j].text = result[i][j] == 0 ? '' : result[i][j].toString();
+                    }
+                  }
+                  _isLoading = false;
+                });
+              } catch (e) {
+                setState(() {
+                  _isLoading = false;
+                });
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(e.toString()),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
                 }
               }
-
-              var k = controllers;
-            }),
-            child: const Text("solve"),
+            },
+            child: _isLoading
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                  )
+                : const Text("SOLVE"),
           ),
-        ),
-      ],
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: _isLoading
+                ? null
+                : () {
+                    for (var row in controllers) {
+                      for (var controller in row) {
+                        controller.clear();
+                      }
+                    }
+                  },
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text("Clear Board"),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text("Hint: type  0  in empty cells"),
+        title: const Text("Sudoku Solver", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        centerTitle: true,
+        backgroundColor: Colors.black,
+        elevation: 0,
       ),
-      body: buildBoard(),
+      body: Center(
+        child: SingleChildScrollView(
+          child: buildBoard()!,
+        ),
+      ),
     );
   }
 }

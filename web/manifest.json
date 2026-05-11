@@ -1,6 +1,6 @@
 {
-    "name": "soduku_solver",
-    "short_name": "soduku_solver",
+    "name": "sudoku_app_resolved",
+    "short_name": "sudoku_app_resolved",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
